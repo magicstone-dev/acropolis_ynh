@@ -1,16 +1,12 @@
 #!/bin/bash
 
 #=================================================
-# COMMON VARIABLES
+# COMMON VARIABLES AND CUSTOM HELPERS
 #=================================================
 
-RUBY_VERSION="2.7.1"
+ruby_version="2.7.1"
 
 MEMORY_NEEDED="2560"
-
-#=================================================
-# PERSONAL HELPERS
-#=================================================
 
 # Returns true if a swap partition is enabled, false otherwise
 # usage: is_swap_present
@@ -37,11 +33,11 @@ is_memory_available() {
 # terminates installation if requirements not met
 check_memory_requirements() {
   if ! is_swap_present ; then
-    ynh_die --message="You must have a swap partition in order to install and use this application"
+    ynh_die "You must have a swap partition in order to install and use this application"
   elif ! is_swappiness_sufficient ; then
-    ynh_die --message="Your swappiness must be higher than 50; please see https://en.wikipedia.org/wiki/Swappiness"
+    ynh_die "Your swappiness must be higher than 50; please see https://en.wikipedia.org/wiki/Swappiness"
   elif ! is_memory_available 1000000 ; then
-    ynh_die --message="You must have a minimum of 1Gb available memory (RAM+swap) for the installation"
+    ynh_die "You must have a minimum of 1Gb available memory (RAM+swap) for the installation"
   fi
 }
 # Checks discourse upgrade memory requirements
@@ -49,7 +45,7 @@ check_memory_requirements() {
 # terminates upgrade if requirements not met
 check_memory_requirements_upgrade() {
   if ! is_memory_available 400000 ; then
-    ynh_die --message="You must have a minimum of 400Mb available memory (RAM+swap) for the upgrade"
+    ynh_die "You must have a minimum of 400Mb available memory (RAM+swap) for the upgrade"
   fi
 }
 
@@ -111,11 +107,3 @@ ynh_maintenance_mode_OFF () {
 
 	systemctl reload nginx
 }
-
-#=================================================
-# EXPERIMENTAL HELPERS
-#=================================================
-
-#=================================================
-# FUTURE OFFICIAL HELPERS
-#=================================================

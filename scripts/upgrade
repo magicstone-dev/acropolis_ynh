@@ -11,100 +11,99 @@ source /usr/share/yunohost/helpers
 #=================================================
 # STOP SYSTEMD SERVICE
 #=================================================
-ynh_script_progression --message="Stopping $app's systemd service..." --weight=1
+ynh_script_progression "Stopping $app's systemd service..."
 
-ynh_systemd_action --service_name="${app}-web" --action="stop" --log_path=systemd
-ynh_systemd_action --service_name="${app}-sidekiq" --action="stop" --log_path=systemd
+ynh_systemctl --service="${app}-web" --action="stop" --log_path=systemd
+ynh_systemctl --service="${app}-sidekiq" --action="stop" --log_path=systemd
 
 #=================================================
 # ENSURE DOWNWARD COMPATIBILITY
 #=================================================
-ynh_script_progression --message="Ensuring downward compatibility..."
+ynh_script_progression "Ensuring downward compatibility..."
 
 ynh_remove_extra_repo
-ynh_app_setting_delete --app="$app" --key=redis_namespace
-ynh_app_setting_delete --app="$app" --key=secret_key_base
+ynh_app_setting_delete --key=redis_namespace
+ynh_app_setting_delete --key=secret_key_base
 
 #=================================================
 # INSTALL DEPENDENCIES
 #=================================================
-ynh_script_progression --message="Updating Ruby..." --weight=1
+ynh_script_progression "Updating Ruby..."
 
-ynh_exec_warn_less ynh_install_ruby --ruby_version="$RUBY_VERSION"
+ynh_ruby_install
 
 #=================================================
 # DOWNLOAD, CHECK AND UNPACK SOURCE
 #=================================================
-ynh_script_progression --message="Upgrading source files..." --weight=1
+ynh_script_progression "Upgrading source files..."
 
 # Download, check integrity, uncompress and patch the source from app.src
-ynh_setup_source --dest_dir="$install_dir" --full_replace=1 --keep="config/database.yml config/diaspora.toml"
+ynh_setup_source --dest_dir="$install_dir" --full_replace --keep="config/database.yml config/diaspora.toml"
 
 mkdir -p "$install_dir/tmp/pids"
 
-chmod -R o-rwx "$install_dir"
-chown -R "$app:www-data" "$install_dir"
-
+#REMOVEME? Assuming the install dir is setup using ynh_setup_source, the proper chmod/chowns are now already applied and it shouldn't be necessary to tweak perms | chmod -R o-rwx "$install_dir"
+#REMOVEME? Assuming the install dir is setup using ynh_setup_source, the proper chmod/chowns are now already applied and it shouldn't be necessary to tweak perms | chown -R "$app:www-data" "$install_dir"
 #=================================================
 # UPDATE A CONFIG FILE
 #=================================================
-ynh_script_progression --message="Updating $app's configuration files..." --weight=1
+ynh_script_progression "Updating $app's configuration files..."
 
-ynh_add_config --template="database.yml.example" --destination="$install_dir/config/database.yml"
-ynh_add_config --template="diaspora.toml.example" --destination="$install_dir/config/diaspora.toml"
+ynh_config_add --template="database.yml.example" --destination="$install_dir/config/database.yml"
+ynh_config_add --template="diaspora.toml.example" --destination="$install_dir/config/diaspora.toml"
 
-chmod 400 "$install_dir/config/database.yml"
-chmod 400 "$install_dir/config/diaspora.toml"
-chown "$app:$app" "$install_dir/config/database.yml"
-chown "$app:$app" "$install_dir/config/diaspora.toml"
+#REMOVEME? Assuming the file is setup using ynh_config_add, the proper chmod/chowns are now already applied and it shouldn't be necessary to tweak perms | chmod 400 "$install_dir/config/database.yml"
+#REMOVEME? Assuming the file is setup using ynh_config_add, the proper chmod/chowns are now already applied and it shouldn't be necessary to tweak perms | chmod 400 "$install_dir/config/diaspora.toml"
+#REMOVEME? Assuming the file is setup using ynh_config_add, the proper chmod/chowns are now already applied and it shouldn't be necessary to tweak perms | chown "$app:$app" "$install_dir/config/database.yml"
+#REMOVEME? Assuming the file is setup using ynh_config_add, the proper chmod/chowns are now already applied and it shouldn't be necessary to tweak perms | chown "$app:$app" "$install_dir/config/diaspora.toml"
 
 #=================================================
 # INSTALLING RUBY AND BUNDLER
 #=================================================
-ynh_script_progression --message="Building $app..."
+ynh_script_progression "Building $app..."
 
 pushd "$install_dir"
-    ynh_use_ruby
-    ynh_gem install bundler:1.17.3 --no-document
-    ynh_exec_as "$app" echo "gem: --no-ri --no-rdoc" >> "$install_dir/.gemrc"
 
-    ynh_exec_warn_less ynh_exec_as "$app" "$ynh_ruby_load_path" bin/bundle config deployment 'true'
-    ynh_exec_warn_less ynh_exec_as "$app" "$ynh_ruby_load_path" bin/bundle config without 'development test'
-    ynh_exec_warn_less ynh_exec_as "$app" "$ynh_ruby_load_path" bin/bundle install --full-index --with postgresql
+    gem install bundler:1.17.3 --no-document
+    ynh_exec_as_app echo "gem: --no-ri --no-rdoc" >> "$install_dir/.gemrc"
 
-    ynh_exec_warn_less ynh_exec_as "$app" "$ynh_ruby_load_path" RAILS_ENV=production bin/rake assets:clean
-    ynh_exec_warn_less ynh_exec_as "$app" "$ynh_ruby_load_path" RAILS_ENV=production bin/rake assets:precompile
-    ynh_exec_warn_less ynh_exec_as "$app" "$ynh_ruby_load_path" RAILS_ENV=production bin/rake db:migrate
+    ynh_hide_warnings ynh_exec_as_app ruby_load_path" bin/bundle config deployment 'true'
+    ynh_hide_warnings ynh_exec_as_app ruby_load_path" bin/bundle config without 'development test'
+    ynh_hide_warnings ynh_exec_as_app ruby_load_path" bin/bundle install --full-index --with postgresql
+
+    ynh_hide_warnings ynh_exec_as_app ruby_load_path" RAILS_ENV=production bin/rake assets:clean
+    ynh_hide_warnings ynh_exec_as_app ruby_load_path" RAILS_ENV=production bin/rake assets:precompile
+    ynh_hide_warnings ynh_exec_as_app ruby_load_path" RAILS_ENV=production bin/rake db:migrate
 popd
 
 #=================================================
 # REAPPLY SYSTEM CONFIGURATIONS
 #=================================================
-ynh_script_progression --message="Upgrading system configurations related to $app..." --weight=1
+ynh_script_progression "Upgrading system configurations related to $app..."
 
 # Create a dedicated NGINX config
-ynh_add_nginx_config
+ynh_config_add_nginx
 
 # Create a dedicated systemd config
-ynh_add_systemd_config --service="$app-web" --template="acropolis-web.service"
+ynh_config_add_systemd --service="$app-web" --template="acropolis-web.service"
 yunohost service add "$app-web" --description="$app web service"
 
-ynh_add_systemd_config --service="$app-sidekiq" --template="acropolis-sidekiq.service"
+ynh_config_add_systemd --service="$app-sidekiq" --template="acropolis-sidekiq.service"
 yunohost service add "$app-sidekiq" --description="$app sidekiq service"
 
 # Use logrotate to manage app-specific logfile(s)
-ynh_use_logrotate --non-append
+ynh_config_add_logrotate
 
 #=================================================
 # START SYSTEMD SERVICE
 #=================================================
-ynh_script_progression --message="Starting $app's systemd service..." --weight=1
+ynh_script_progression "Starting $app's systemd service..."
 
-ynh_systemd_action --service_name="${app}-web" --action="start" --log_path=systemd --line_match="listening on"
-ynh_systemd_action --service_name="${app}-sidekiq" --action="start" --log_path=systemd --line_match="Booted Rails"
+ynh_systemctl --service="${app}-web" --action="start" --log_path=systemd --wait_until="listening on"
+ynh_systemctl --service="${app}-sidekiq" --action="start" --log_path=systemd --wait_until="Booted Rails"
 
 #=================================================
 # END OF SCRIPT
 #=================================================
 
-ynh_script_progression --message="Upgrade of $app completed" --last
+ynh_script_progression "Upgrade of $app completed"

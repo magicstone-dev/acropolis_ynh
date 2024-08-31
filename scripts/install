@@ -11,14 +11,14 @@ source /usr/share/yunohost/helpers
 #=================================================
 # INSTALL DEPENDENCIES
 #=================================================
-ynh_script_progression --message="Installing Ruby..." --weight=1
+ynh_script_progression "Installing Ruby..."
 
-ynh_exec_warn_less ynh_install_ruby --ruby_version="$RUBY_VERSION"
+ynh_ruby_install
 
 #=================================================
 # ADD SWAP IF NEEDED
 #=================================================
-ynh_script_progression --message="Adding swap if needed..."
+ynh_script_progression "Adding swap if needed..."
 
 total_memory=$(ynh_get_ram --total)
 swap_needed=0
@@ -28,92 +28,92 @@ if (( MEMORY_NEEDED > total_memory )); then
     swap_needed=$((MEMORY_NEEDED - total_memory))
 fi
 
-ynh_script_progression --message="Adding $swap_needed Mo to swap..."
+ynh_script_progression "Adding $swap_needed Mo to swap..."
 ynh_add_swap --size=$swap_needed
 
 #=================================================
 # CREATE A POSTGRESQL DATABASE
 #=================================================
-ynh_script_progression --message="Setting the PostgreSQL database..."
+ynh_script_progression "Setting the PostgreSQL database..."
 
-ynh_psql_execute_as_root --sql="CREATE EXTENSION IF NOT EXISTS hstore;" --database="$db_name"
-ynh_psql_execute_as_root --sql="CREATE EXTENSION IF NOT EXISTS pg_trgm;" --database="$db_name"
+ynh_psql_db_shell <<< "CREATE EXTENSION IF NOT EXISTS hstore;"
+
+ynh_psql_db_shell <<< "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
 
 #=================================================
 # DOWNLOAD, CHECK AND UNPACK SOURCE
 #=================================================
-ynh_script_progression --message="Setting up source files..." --weight=1
+ynh_script_progression "Setting up source files..."
 
 ynh_setup_source --dest_dir="$install_dir"
 
 mkdir -p "$install_dir/tmp/pids"
 
-chmod -R o-rwx "$install_dir"
-chown -R "$app:www-data" "$install_dir"
-
+#REMOVEME? Assuming the install dir is setup using ynh_setup_source, the proper chmod/chowns are now already applied and it shouldn't be necessary to tweak perms | chmod -R o-rwx "$install_dir"
+#REMOVEME? Assuming the install dir is setup using ynh_setup_source, the proper chmod/chowns are now already applied and it shouldn't be necessary to tweak perms | chown -R "$app:www-data" "$install_dir"
 #=================================================
 # ADD A CONFIGURATION
 #=================================================
-ynh_script_progression --message="Adding a configuration file..." --weight=1
+ynh_script_progression "Adding $app's configuration..."
 
-ynh_add_config --template="database.yml.example" --destination="$install_dir/config/database.yml"
-ynh_add_config --template="diaspora.toml.example" --destination="$install_dir/config/diaspora.toml"
+ynh_config_add --template="database.yml.example" --destination="$install_dir/config/database.yml"
+ynh_config_add --template="diaspora.toml.example" --destination="$install_dir/config/diaspora.toml"
 
-chmod 400 "$install_dir/config/database.yml"
-chmod 400 "$install_dir/config/diaspora.toml"
-chown "$app:$app" "$install_dir/config/database.yml"
-chown "$app:$app" "$install_dir/config/diaspora.toml"
+#REMOVEME? Assuming the file is setup using ynh_config_add, the proper chmod/chowns are now already applied and it shouldn't be necessary to tweak perms | chmod 400 "$install_dir/config/database.yml"
+#REMOVEME? Assuming the file is setup using ynh_config_add, the proper chmod/chowns are now already applied and it shouldn't be necessary to tweak perms | chmod 400 "$install_dir/config/diaspora.toml"
+#REMOVEME? Assuming the file is setup using ynh_config_add, the proper chmod/chowns are now already applied and it shouldn't be necessary to tweak perms | chown "$app:$app" "$install_dir/config/database.yml"
+#REMOVEME? Assuming the file is setup using ynh_config_add, the proper chmod/chowns are now already applied and it shouldn't be necessary to tweak perms | chown "$app:$app" "$install_dir/config/diaspora.toml"
 
 #=================================================
 # INSTALLING RUBY AND BUNDLER
 #=================================================
-ynh_script_progression --message="Building $app..."
+ynh_script_progression "Building $app..."
 
 pushd "$install_dir"
-    ynh_use_ruby
-    ynh_gem install bundler:1.17.3 --no-document
-    ynh_exec_as "$app" echo "gem: --no-ri --no-rdoc" >> "$install_dir/.gemrc"
-    ynh_exec_as "$app" chmod +x script/server
 
-    ynh_exec_warn_less ynh_exec_as "$app" "$ynh_ruby_load_path" script/configure_bundler
-    ynh_exec_warn_less ynh_exec_as "$app" "$ynh_ruby_load_path" bin/bundle config set path 'vendor/bundle'
-    ynh_exec_warn_less ynh_exec_as "$app" "$ynh_ruby_load_path" bin/bundle install --full-index --with postgresql
+    gem install bundler:1.17.3 --no-document
+    ynh_exec_as_app echo "gem: --no-ri --no-rdoc" >> "$install_dir/.gemrc"
+    ynh_exec_as_app chmod +x script/server
+
+    ynh_hide_warnings ynh_exec_as_app ruby_load_path" script/configure_bundler
+    ynh_hide_warnings ynh_exec_as_app ruby_load_path" bin/bundle config set path 'vendor/bundle'
+    ynh_hide_warnings ynh_exec_as_app ruby_load_path" bin/bundle install --full-index --with postgresql
 popd
 
-ynh_script_progression --message="Preparing the database and create initial admin user..."
+ynh_script_progression "Preparing the database and create initial admin user..."
 
 pushd "$install_dir"
-    ynh_exec_warn_less ynh_exec_as "$app" "$ynh_ruby_load_path" RAILS_ENV=production bin/rake db:migrate
-    ynh_exec_warn_less ynh_exec_as "$app" "$ynh_ruby_load_path" RAILS_ENV=production bin/rake assets:precompile
-    ynh_exec_warn_less ynh_exec_as "$app" "$ynh_ruby_load_path" RAILS_ENV=production bin/rake "admin:create[$admin, $email, $password]"
+    ynh_hide_warnings ynh_exec_as_app ruby_load_path" RAILS_ENV=production bin/rake db:migrate
+    ynh_hide_warnings ynh_exec_as_app ruby_load_path" RAILS_ENV=production bin/rake assets:precompile
+    ynh_hide_warnings ynh_exec_as_app ruby_load_path" RAILS_ENV=production bin/rake "admin:create[$admin, $email, $password]"
 popd
 
 #=================================================
 # SYSTEM CONFIGURATION
 #=================================================
-ynh_script_progression --message="Adding system configurations related to $app..." --weight=1
+ynh_script_progression "Adding system configurations related to $app..."
 
-ynh_add_nginx_config
+ynh_config_add_nginx
 
-ynh_add_systemd_config --service="$app-web" --template="$app-web.service"
+ynh_config_add_systemd --service="$app-web" --template="$app-web.service"
 yunohost service add "$app-web" --description="$app web service"
 
-ynh_add_systemd_config --service="$app-sidekiq" --template="$app-sidekiq.service"
+ynh_config_add_systemd --service="$app-sidekiq" --template="$app-sidekiq.service"
 yunohost service add "$app-sidekiq" --description="$app sidekiq service"
 
 # Use logrotate to manage application logfile(s)
-ynh_use_logrotate
+ynh_config_add_logrotate
 
 #=================================================
 # START SYSTEMD SERVICE
 #=================================================
-ynh_script_progression --message="Starting a systemd service..." --weight=1
+ynh_script_progression "Starting $app's systemd service..."
 
-ynh_systemd_action --service_name="${app}-web" --action="start" --log_path=systemd --line_match="listening on"
-ynh_systemd_action --service_name="${app}-sidekiq" --action="start" --log_path=systemd --line_match="Booted Rails"
+ynh_systemctl --service="${app}-web" --action="start" --log_path=systemd --wait_until="listening on"
+ynh_systemctl --service="${app}-sidekiq" --action="start" --log_path=systemd --wait_until="Booted Rails"
 
 #=================================================
 # END OF SCRIPT
 #=================================================
 
-ynh_script_progression --message="Installation of $app completed" --last
+ynh_script_progression "Installation of $app completed"
